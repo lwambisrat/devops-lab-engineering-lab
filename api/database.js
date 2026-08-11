@@ -19,12 +19,12 @@ const MYSQL_CONFIG = {
   password: process.env.MYSQL_PASSWORD || 'labpassword',
   database: process.env.MYSQL_DATABASE || 'capacity_lab',
 
-  // Keep the pool small so we don't overwhelm the database with connections.
+  // Size the pool for bursty lightweight reads while avoiding queue-limit drops.
   waitForConnections: true,
-  connectionLimit: 2,
+  connectionLimit: 20,
   queueLimit: 0,
   connectTimeout: 10_000,
-  maxIdle: 2,
+  maxIdle: 20,
   idleTimeout: 60_000,
   enableKeepAlive: true,
 };

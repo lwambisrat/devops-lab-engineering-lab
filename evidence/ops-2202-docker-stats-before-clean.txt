@@ -1,0 +1,3 @@
+CONTAINER ID   NAME           CPU %     MEM USAGE / LIMIT     MEM %     NET I/O          BLOCK I/O       PIDS
+fb571bd3404a   mysql-db       0.80%     471.7MiB / 10.44GiB   4.41%     104MB / 22.8GB   188kB / 445MB   46
+84cb198f3262   capacity-api   0.93%     39.26MiB / 160MiB     24.54%    705MB / 897MB    0B / 0B         11

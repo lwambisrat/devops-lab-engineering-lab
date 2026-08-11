@@ -83,7 +83,10 @@ app.get('/api/patients/recent', async (_req, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query(
-      'SELECT * FROM patients ORDER BY id DESC LIMIT 50'
+      `SELECT id, first_name, last_name, email, diagnosis, created_at
+       FROM patients
+       ORDER BY id DESC
+       LIMIT 50`
     );
     res.json({ count: rows.length, data: rows });
   } catch (err) {

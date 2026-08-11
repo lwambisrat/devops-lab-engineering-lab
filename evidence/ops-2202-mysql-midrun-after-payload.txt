@@ -1,0 +1,27 @@
+Variable_name	Value
+Threads_running	3
+Variable_name	Value
+Threads_connected	21
+Id	User	Host	db	Command	Time	State	Info
+5	event_scheduler	localhost	NULL	Daemon	27610	Waiting on empty queue	NULL
+5439	root	172.21.0.4:42644	capacity_lab	Sleep	0		NULL
+5440	root	172.21.0.4:42648	capacity_lab	Sleep	0		NULL
+5441	root	172.21.0.4:42654	capacity_lab	Sleep	0		NULL
+5442	root	172.21.0.4:42670	capacity_lab	Sleep	0		NULL
+5443	root	172.21.0.4:42678	capacity_lab	Sleep	0		NULL
+5444	root	172.21.0.4:42680	capacity_lab	Sleep	0		NULL
+5445	root	172.21.0.4:42686	capacity_lab	Sleep	0		NULL
+5446	root	172.21.0.4:42696	capacity_lab	Sleep	0		NULL
+5447	root	172.21.0.4:42706	capacity_lab	Sleep	0		NULL
+5448	root	172.21.0.4:42722	capacity_lab	Sleep	0		NULL
+5449	root	172.21.0.4:42732	capacity_lab	Sleep	0		NULL
+5450	root	172.21.0.4:42748	capacity_lab	Sleep	0		NULL
+5451	root	172.21.0.4:42754	capacity_lab	Sleep	0		NULL
+5452	root	172.21.0.4:42770	capacity_lab	Sleep	0		NULL
+5453	root	172.21.0.4:42786	capacity_lab	Sleep	0		NULL
+5454	root	172.21.0.4:42800	capacity_lab	Sleep	0		NULL
+5455	root	172.21.0.4:42790	capacity_lab	Sleep	0		NULL
+5456	root	172.21.0.4:42810	capacity_lab	Sleep	0		NULL
+5457	root	172.21.0.4:42816	capacity_lab	Sleep	0		NULL
+5458	root	172.21.0.4:42824	capacity_lab	Sleep	0		NULL
+5480	root	localhost	capacity_lab	Query	0	init	SHOW FULL PROCESSLIST

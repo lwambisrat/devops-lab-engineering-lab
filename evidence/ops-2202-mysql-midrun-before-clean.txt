@@ -1,0 +1,9 @@
+Variable_name	Value
+Threads_running	2
+Variable_name	Value
+Threads_connected	3
+Id	User	Host	db	Command	Time	State	Info
+5	event_scheduler	localhost	NULL	Daemon	26831	Waiting on empty queue	NULL
+5281	root	172.21.0.4:39714	capacity_lab	Sleep	0		NULL
+5282	root	172.21.0.4:39716	capacity_lab	Sleep	0		NULL
+5284	root	localhost	capacity_lab	Query	0	init	SHOW FULL PROCESSLIST

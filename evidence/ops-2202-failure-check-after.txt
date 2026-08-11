@@ -1,0 +1,22 @@
+Command:
+curl -s localhost:3000/metrics | grep db_errors_total
+docker compose logs --tail=100 capacity-api
+curl -s localhost:3000/metrics | grep 'http_requests_total{route="/api/patients/recent"'
+
+Output:
+# HELP db_errors_total Total number of database errors by type
+# TYPE db_errors_total counter
+capacity-api  | capacity-api listening on :3000 (metrics at /metrics)
+http_requests_total{route="/api/patients/recent",status_code="200"} 122476
+
+Interpretation:
+The final OPS-2202 run had failed HTTP checks, but Prometheus exposed no
+non-zero db_errors_total series and the API logs did not show database
+exceptions. The only HTTP response metric for `/api/patients/recent` was
+`status_code="200"`, so Express did not finish any 500 responses for this
+route. Because the middleware records metrics on `res.on('finish')`, this means
+the failed k6 requests either were not accepted by the app or were aborted
+before Express finished the response. The mechanism is connection-level
+failure, such as accept-queue pressure or socket resets, not a database or
+application 500 error. Combined with API CPU above MySQL CPU, this identifies
+API/socket/request handling overload under 2000 VUs.
