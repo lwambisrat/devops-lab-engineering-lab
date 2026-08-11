@@ -19,10 +19,16 @@ fixing each incident.
 
 ## OPS-2202
 
-- `ops-2202-before-k6.txt`
-- `ops-2202-docker-stats-before.txt`
+- `ops-2202-before-k6-clean.txt`
+- `ops-2202-mysql-midrun-before-clean.txt`
+- `ops-2202-docker-stats-before-clean.txt`
 - `ops-2202-after-k6.txt`
+- `ops-2202-mysql-midrun-after.txt`
 - `ops-2202-docker-stats-after.txt`
+- `ops-2202-after-k6-payload-rerun.txt`
+- `ops-2202-mysql-midrun-after-payload.txt`
+- `ops-2202-docker-stats-after-payload.txt`
+- `ops-2202-failure-check-after.txt`
 - `ops-2202-grafana-before.png`
 - `ops-2202-grafana-after.png`
 

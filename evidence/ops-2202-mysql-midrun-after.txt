@@ -1,0 +1,27 @@
+Variable_name	Value
+Threads_running	3
+Variable_name	Value
+Threads_connected	21
+Id	User	Host	db	Command	Time	State	Info
+5	event_scheduler	localhost	NULL	Daemon	27269	Waiting on empty queue	NULL
+5368	root	172.21.0.4:44276	capacity_lab	Sleep	1		NULL
+5369	root	172.21.0.4:44282	capacity_lab	Sleep	1		NULL
+5370	root	172.21.0.4:44284	capacity_lab	Sleep	1		NULL
+5371	root	172.21.0.4:44298	capacity_lab	Sleep	1		NULL
+5372	root	172.21.0.4:44312	capacity_lab	Sleep	1		NULL
+5373	root	172.21.0.4:44322	capacity_lab	Sleep	1		NULL
+5374	root	172.21.0.4:44338	capacity_lab	Sleep	1		NULL
+5375	root	172.21.0.4:44354	capacity_lab	Sleep	1		NULL
+5376	root	172.21.0.4:44364	capacity_lab	Sleep	0		NULL
+5377	root	172.21.0.4:44380	capacity_lab	Sleep	1		NULL
+5378	root	172.21.0.4:44366	capacity_lab	Query	0	executing	SELECT * FROM patients ORDER BY id DESC LIMIT 50
+5379	root	172.21.0.4:44390	capacity_lab	Sleep	1		NULL
+5380	root	172.21.0.4:44406	capacity_lab	Sleep	1		NULL
+5381	root	172.21.0.4:44412	capacity_lab	Sleep	1		NULL
+5382	root	172.21.0.4:44418	capacity_lab	Sleep	1		NULL
+5383	root	172.21.0.4:44432	capacity_lab	Sleep	1		NULL
+5384	root	172.21.0.4:44444	capacity_lab	Sleep	1		NULL
+5385	root	172.21.0.4:44440	capacity_lab	Sleep	1		NULL
+5386	root	172.21.0.4:44456	capacity_lab	Sleep	0		NULL
+5387	root	172.21.0.4:44472	capacity_lab	Sleep	1		NULL
+5392	root	localhost	capacity_lab	Query	0	init	SHOW FULL PROCESSLIST

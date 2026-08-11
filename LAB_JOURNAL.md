@@ -185,33 +185,107 @@ Capture the control group you'll compare every incident against.
 > because `connectionLimit` is set to 2, so most requests wait in the API for a free connection before their cheap query can even reach MySQL.
 
 ### Observation (evidence)
-> Where is time spent between request arrival and query execution? Capture the
-> error codes and any queue/timeout evidence from logs and metrics:
-> ```
+> Before changing the pool, the surge test reached 1537.71 req/s with
+> p95=1.8s and 0.00% request failures. MySQL showed `Threads_connected=3` and
+> `Threads_running=2`, which matches the configured two application pool
+> connections plus the inspection connection. The database was not reporting
+> errors, but requests were spending most of their time waiting above the
+> database layer.
 >
-> ```
-| Metric                    | Value | vs. baseline |
-|---------------------------|-------|--------------|
-| Successful RPS (plateau)  |       |              |
-| p95 / p99 latency         |       |              |
-| Error / timeout rate      |       |              |
-| Avg service time per query (s) |  |              |
+> The first fix attempt raised the pool to 20 connections. That proved the pool
+> configuration changed (`Threads_connected=21` after the change), but it did
+> not prove the pool was the dominant bottleneck. Pool-only changed throughput
+> by only 2.8% (1537.71/s -> 1581.49/s) and p95 by 8.9% (1.8s -> 1.64s), which
+> is small compared with the 32% p95 variance seen between baseline runs. The
+> useful discovery was that the original pool hypothesis was mostly wrong.
+>
+> The final OPS-2202 run used a wider pool and a smaller `/api/patients/recent`
+> payload. That run reached 1896.60 req/s with p95=1.17s and 0.57% failures.
+> Grafana showed `/api/patients/recent` throughput around 1.0K-1.1K req/s,
+> p95 mostly around 1.0s-1.8s with a spike near 2.3s, no DB error series, and
+> API memory below the 160MB limit. Grafana's throughput panel uses
+> `rate(...[1m])`, so the 30-second k6 run is averaged with idle time on both
+> sides of the selected window; that is why Grafana's visual rate is lower than
+> k6's 1896.60 req/s summary. Docker stats during the final run showed
+> `capacity-api` at 123.33% CPU while MySQL was at 23.00% CPU. The earlier
+> `ops-2202-docker-stats-before-clean.txt` capture was taken off-load and is
+> kept only as a container-state artifact, not as before-run CPU evidence.
+>
+> Failure check after the final run: `db_errors_total` existed in metrics, but
+> there was no non-zero DB error series, and `docker compose logs --tail=100
+> capacity-api` only showed the startup line. `http_requests_total` for
+> `/api/patients/recent` had only `status_code="200"`, so Express did not finish
+> any 500 responses. Since this middleware records on `res.on('finish')`, the
+> failed k6 requests were connection-level failures: either not accepted by the
+> app or aborted before Express finished the response. They were not MySQL
+> errors and not application 500 responses.
+
+| Metric                    | Baseline | Before | Pool only | Pool + smaller payload |
+|---------------------------|----------|--------|-----------|-------------------------|
+| Successful RPS            | 49.42/s | 1537.71/s | 1581.49/s | 1896.60/s |
+| p95 latency               | 19.27ms | 1.8s | 1.64s | 1.17s |
+| p95 vs. baseline          | 1x | 93.4x worse | 85.1x worse | 60.7x worse |
+| Error / timeout rate      | 0.00% | 0.00% | 0.89% | 0.57% |
+| Data received             | 28MB | 875MB | 894MB | 460MB |
+| MySQL threads connected   | n/a | 3 | 21 | 21 |
+| MySQL threads running     | n/a | 2 | 3 | 3 |
 
 ### Root cause & mechanism
-> Explain the paradox: idle database, trivial query, stalled app. What finite
-> resource is being contended, and where does it live? Derive the *right* size
-> for that resource from your measured throughput and service time (state the
-> relationship you used):
-> - Measured avg service time W = ______ s
-> - Target throughput λ = ______ req/s
-> - Required capacity = ______  (show your working)
-> Why does making it arbitrarily large eventually stop helping? ______________
+> The original "DB looks idle while the app freezes" report was correct, but my
+> first hypothesis about the dominant mechanism was mostly wrong. The
+> two-connection MySQL pool looked suspicious, but increasing it to 20 barely
+> improved throughput or p95. The dominant mechanism was API-side response
+> handling: the single Node process had to build JSON responses and push them
+> through sockets for 2000 concurrent clients.
+>
+> The math disproves the pool as the main constraint. In the before run, Little's
+> Law gives `L = lambda * W = 1537.71 req/s * 1.17s avg latency = about 1799`
+> in-flight requests, close to the 2000 VUs in the test. If two connections were
+> serving 1537.71 req/s, the implied DB service time was
+> `2 / 1537.71 = 1.3ms/query`. The required pool width for 2000 req/s at that
+> service time is `2000 req/s * 0.0013s = 2.6 connections`, so two connections
+> were already close to sufficient for DB work. A pool of 20 cannot help much
+> once the bottleneck is outside MySQL.
+>
+> The strongest proof is the after-run resource split: MySQL had 21 connected
+> threads but only 3 running threads and 23.00% CPU, while `capacity-api` used
+> 123.33% CPU. Reducing the response payload cut network volume from 894MB to
+> 460MB and improved p95 from 1.64s to 1.17s. That points to Node CPU,
+> serialization, and socket output, not MySQL saturation. The non-200 k6 checks
+> did not appear as Express 500s, so the remaining failure mode is at the
+> connection layer above the app handler. The endpoint still missed a 300ms p95
+> target under 2000 VUs.
 
 ### Fix & verify
-> The change you made: ______________________________________________________
-> New RPS: ______  New error rate: ______  New p95: ______
-> What upstream protection would make a burst degrade gracefully instead of
-> collapsing? _______________________________________________________________
+> Fix applied for this incident: the MySQL pool was increased from 2 to 20
+> connections with an unbounded wait queue, and `/api/patients/recent` was
+> changed from `SELECT *` to the same bounded summary columns used by the search
+> endpoint: `id`, `first_name`, `last_name`, `email`, `diagnosis`, and
+> `created_at`.
+>
+> Verification: the rerun reached 1896.60 req/s, p95=1.17s, and 0.57% failures.
+> That is better than the before run (1537.71 req/s, p95=1.8s), and the payload
+> size dropped from 875MB to 460MB. The fix is a partial improvement, not a full
+> SLO pass. The strongest conclusion is that the database pool was not the
+> dominant constraint; after widening it, API response work remained the limit.
+>
+> Upstream protection: this endpoint needs admission control or rate limiting
+> before the API accepts more concurrent work than it can finish inside the
+> latency target. A production version should return a controlled overload
+> response instead of allowing thousands of requests to build up inside the
+> Node process.
+>
+> Baseline caveat for later incidents: OPS-2202 changed the `/api/patients/recent`
+> response from `SELECT *` to summary columns, so the original baseline was
+> measured against a larger payload than the current code returns. That change is
+> negligible at the baseline's 49.42 req/s, but OPS-2203 and OPS-2204 comparisons
+> should note that the control group was captured before the OPS-2202 payload
+> reduction.
+>
+> Prediction for OPS-2204: raising `connectionLimit` to 20 can make the export
+> incident worse because `/api/patients/export` still performs an unbounded
+> `SELECT *` and returns every patient row. More concurrent export queries will
+> multiply heap pressure against the 160MB API container limit.
 
 ---
 
