@@ -1,0 +1,1 @@
+capacity-api  | capacity-api listening on :3000 (metrics at /metrics)

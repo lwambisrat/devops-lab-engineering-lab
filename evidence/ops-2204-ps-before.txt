@@ -1,0 +1,2 @@
+NAME           IMAGE                                      COMMAND                  SERVICE        CREATED          STATUS              PORTS
+capacity-api   db-capacity-engineering-lab-capacity-api   "docker-entrypoint.s…"   capacity-api   21 minutes ago   Up About a minute   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp

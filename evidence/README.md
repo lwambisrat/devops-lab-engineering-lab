@@ -55,10 +55,17 @@ fixing each incident.
 
 - `ops-2204-before-k6.txt`
 - `ops-2204-docker-stats-before.txt`
+- `ops-2204-docker-events-before.txt`
+- `ops-2204-oom-inspect-before.txt`
+- `ops-2204-ps-before.txt`
 - `ops-2204-restart-count-before.txt`
 - `ops-2204-logs-before.txt`
 - `ops-2204-after-k6.txt`
 - `ops-2204-docker-stats-after.txt`
+- `ops-2204-docker-events-after.txt`
+- `ops-2204-oom-inspect-after.txt`
+- `ops-2204-ps-after.txt`
+- `ops-2204-metrics-after.txt`
 - `ops-2204-restart-count-after.txt`
-- `ops-2204-grafana-before.png`
+- `ops-2204-logs-after.txt`
 - `ops-2204-grafana-after.png`

@@ -29,8 +29,9 @@
 
 ## OPS-2204 — Export OOM
 
-- **S — Symptom:** Pending investigation.
-- **C — Cause:** Pending investigation.
-- **A — Action:** Pending investigation.
-- **R — Result:** Pending investigation.
-- **Scar / lesson:** Pending investigation.
+- **S — Symptom:** The nightly export caused repeated API restarts. During the before run, Docker showed API memory at 159.8MiB / 160MiB, and Docker events showed 14 `oom`, 14 `die exitCode=137`, and 14 `start` events.
+- **C — Cause:** `/api/patients/export` used O(N) memory per request by loading every patient row with `SELECT *`, storing the full result set in Node, and serializing one huge JSON response. With concurrent exports, API memory exceeded the 160MB container limit.
+- **A — Action:** Reworked `/api/patients/export` to stream the JSON response in 500-row batches using keyset pagination instead of materializing the full export at once.
+- **R — Result:** After the fix, 150/150 k6 checks passed with 0.00% failures. API memory stayed around 71.5MiB / 160MiB during the sampled run, and the after-events window had 0 OOM/die/start events.
+- **Evidence:** `LAB_JOURNAL.md` OPS-2204 section, `evidence/ops-2204-before-k6.txt`, `evidence/ops-2204-docker-stats-before.txt`, `evidence/ops-2204-docker-events-before.txt`, `evidence/ops-2204-logs-before.txt`, `evidence/ops-2204-after-k6.txt`, `evidence/ops-2204-docker-stats-after.txt`, `evidence/ops-2204-docker-events-after.txt`, `evidence/ops-2204-restart-count-after.txt`.
+- **Scar / lesson:** Full-table exports are availability risks when they materialize the whole result in application memory. Streaming makes memory bounded, but it does not make the export cheap: the fixed endpoint still sends about 36.7MB per export and has p95 around 51.49s under 50 VUs.

@@ -404,37 +404,92 @@ Capture the control group you'll compare every incident against.
 > because the endpoint loads every patient row into Node memory with `SELECT * FROM patients` and then serializes one huge JSON response. With 50 concurrent export callers, memory can exceed the 160MB container limit and trigger OOM restarts.
 
 ### Observation (evidence)
-> Watch `nodejs_heap_size_used_bytes`, GC pauses, and restarts:
-> ```bash
-> docker stats
-> docker compose logs -f capacity-api
-> ```
-| Metric                          | Value |
-|---------------------------------|-------|
-| Approx. payload size per request|       |
-| Peak heap before crash          |       |
-| Time-to-first-crash             |       |
-| Container restart count         |       |
-| GC pause trend                  |       |
-
-> Paste the crash / exit log lines:
-> ```
+> The before run reproduced a container-level failure, not a database error.
+> During the run, Docker stats showed `capacity-api` at 159.8MiB / 160MiB
+> (99.89% of its memory limit) and 109.60% CPU while MySQL was only at 0.67%
+> CPU. The API restart count reached 12 during the first capture and 26 after
+> the crash loop continued. The before k6 file was truncated before its final
+> summary, but its progress output shows the failure shape: the run reported
+> hundreds of thousands of completed iterations while the API was repeatedly
+> restarting, which means requests were failing immediately against a dead or
+> restarting socket rather than completing real exports.
 >
-> ```
+> Docker events provided the strongest proof: repeated
+> `container oom`, then `container die ... exitCode=137`, then `container start`
+> for `capacity-api` between 23:38:01.528 and 23:41:32.228. The event file
+> contains 14 `oom` events, 14 `die exitCode=137` events, and 14 `start` events.
+> The `die` events show each failed container instance survived only 6-10s under
+> the export job (`execDuration=6` x5, `7` x3, `8` x4, `9` x1, `10` x1). That
+> reconciles the restart counter change from 12 to 26. The API logs also showed
+> the service starting repeatedly, which matches the restart loop.
+> Grafana was not reliable for route-level export evidence during the failure
+> because the API was repeatedly dying, so Prometheus could not consistently
+> scrape `/metrics`.
+
+| Metric                          | Before | After |
+|---------------------------------|--------|-------|
+| API memory sample               | 159.8MiB / 160MiB (99.89%) | 71.5MiB / 160MiB (44.69%) |
+| API CPU sample                  | 109.60% | 125.57% |
+| MySQL CPU sample                | 0.67% | 15.06% |
+| Docker OOM/die/start events     | 14 / 14 / 14 | 0 / 0 / 0 in after-events window |
+| Time alive before crash         | 6-10s per restarted instance | no crash in sampled after window |
+| Restart count                   | 12, then 26 in same crash loop | 0 on rebuilt fixed container |
+| Peak Node heap                  | not captured; API died before reliable `/metrics` scrape | 26,685,832 bytes (~25.4MiB) post-run sample |
+| k6 checks                       | no final summary; run interrupted by crash loop | 150/150 passed |
+| Error rate                      | not reported by truncated k6 output | 0.00% |
 
 ### Root cause & mechanism
-> Estimate per-row size, then the full payload: rows × bytes/row = ______ MB.
-> With C concurrent callers, peak resident memory ≈ ______ MB — compare to the
-> container's memory budget (160MB locally / 256MB in prod). Explain what happens
-> to GC frequency, CPU, and
-> throughput as live heap approaches the limit, and why the current approach
-> uses O(N) memory while a better one could use far less. ____________________
+> The root cause is unbounded result materialization in
+> `/api/patients/export`. The endpoint ran `SELECT * FROM patients`, stored the
+> full result set in a JavaScript array, then asked Express to serialize one huge
+> JSON response. With 50 export callers and the OPS-2202 pool widened to 20
+> MySQL connections, multiple full-table exports could be live in the Node
+> process at the same time.
+>
+> The mechanism is O(N) memory per request, multiplied by concurrency. From the
+> after run, one successful full export response was about
+> `5.5GB / 150 = 36.7MB` over the wire, which is about
+> `36.7MB / 100,000 rows = 367 bytes/row` serialized. Before the fix, Node had
+> to hold the MySQL rows plus the JSON/string/socket buffers for each in-flight
+> export. Wire bytes are not the same as resident memory, but they show the
+> scale: one unfixed in-flight export can hold roughly JS row objects (~48MB),
+> JSON/string output (~35MB), and socket buffers (~35MB), or about 120MB before
+> overhead. Against a 160MB container limit, one or two concurrent full exports
+> can be enough to OOM the process; the 50-VU test and 20-connection pool made
+> that failure repeat quickly.
+>
+> The container configuration makes the crash sharper: `docker-compose.yml`
+> gives Node `--max-old-space-size=256`, but the API container is capped at
+> 160MB. V8 believes it can grow beyond the cgroup memory limit, so it can
+> over-commit before garbage collection rescues the process. The 109.60% API CPU
+> sample during the crash loop is consistent with GC pressure while live export
+> data approaches the cap. At the captured failure point the API hit
+> 159.8MiB / 160MiB and Docker killed it with exit code 137. MySQL was idle
+> because the crash was in API memory, not in the database.
 
 ### Fix & verify
-> The change you made (consider: bounding how much of the result set is in
-> memory at once, streaming to the response, sensible page sizes, compression):
-> ____________________________________________________________________________
-> Re-run evidence — new peak heap: ______  restarts: ______  error rate: ______
+> Fix applied: I changed `/api/patients/export` to stream one JSON response in
+> 500-row batches using keyset pagination (`WHERE id > ? ORDER BY id LIMIT ?`).
+> The API still exports all patient rows, but it no longer holds the full result
+> set and full serialized JSON body in memory at once.
+>
+> Verification: the after k6 run completed successfully with 150/150 checks
+> passing, 0.00% failures, and 150 full exports completed. Docker stats during
+> the run showed `capacity-api` at 71.5MiB / 160MiB (44.69%) instead of
+> 159.8MiB / 160MiB. The after-window Docker events capture records the command
+> and no output, meaning zero OOM, die, or start events during that sampled
+> window. Final inspect showed the rebuilt fixed container at
+> `OOMKilled=false ExitCode=0 RestartCount=0`; because the container was rebuilt,
+> I treat `RestartCount=0` as "no restarts since the fixed deploy," not as a
+> direct continuation of the before counter. API logs showed only the startup
+> line.
+>
+> The exported payload was still large: k6 received 5.5GB total, and p95 was
+> 51.49s. That is the trade-off of preserving a full-table export: it is stable
+> and bounded in memory, but still slow and bandwidth-heavy. Two production
+> improvements would be cheaper than this JSON-array streaming approach:
+> mysql2 row streaming would avoid about 200 batch queries per export, and
+> dropping unneeded large fields such as `notes` would reduce bytes sent.
 
 ---
 
