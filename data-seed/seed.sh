@@ -47,7 +47,8 @@ CREATE TABLE patients (
   email        VARCHAR(128) NOT NULL,
   diagnosis    VARCHAR(255) NOT NULL,
   notes        TEXT         NOT NULL,
-  created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+  created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_patients_last_name (last_name)
 ) ENGINE=InnoDB;
 
 CREATE TABLE hospitals (
