@@ -166,11 +166,45 @@ function notifyBedRegistry(_hospitalId) {
 app.get('/api/patients/export', async (_req, res) => {
   try {
     const pool = getPool();
-    const [rows] = await pool.query('SELECT * FROM patients');
-    res.json({ count: rows.length, data: rows });
+    const batchSize = 500;
+    let lastId = 0;
+    let firstRow = true;
+
+    const [[{ count }]] = await pool.query('SELECT COUNT(*) AS count FROM patients');
+
+    res.setHeader('Content-Type', 'application/json');
+    res.write(`{"count":${count},"data":[`);
+
+    while (!res.destroyed) {
+      const [rows] = await pool.query(
+        `SELECT *
+         FROM patients
+         WHERE id > ?
+         ORDER BY id
+         LIMIT ?`,
+        [lastId, batchSize]
+      );
+
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        lastId = row.id;
+        const chunk = `${firstRow ? '' : ','}${JSON.stringify(row)}`;
+        firstRow = false;
+        if (!res.write(chunk)) {
+          await new Promise((resolve) => res.once('drain', resolve));
+        }
+      }
+    }
+
+    if (!res.destroyed) res.end(']}');
   } catch (err) {
     dbErrorsTotal.inc({ route: '/api/patients/export', code: err.code || 'UNKNOWN' });
-    res.status(500).json({ error: err.code || 'ERROR', message: err.message });
+    if (res.headersSent) {
+      res.destroy(err);
+    } else {
+      res.status(500).json({ error: err.code || 'ERROR', message: err.message });
+    }
   }
 });
 

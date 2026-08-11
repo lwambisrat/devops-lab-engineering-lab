@@ -1,0 +1,10 @@
+Command:
+docker events --since 10m --until 0s --filter container=capacity-api
+
+Output:
+(no output)
+
+Interpretation:
+No Docker oom, die, or start events were emitted for capacity-api in the sampled
+post-fix window. This supports the after-run claim that the streaming export did
+not trigger container restarts during the verification window.

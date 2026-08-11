@@ -1,0 +1,5 @@
+# HELP nodejs_heap_size_used_bytes Process heap size used from Node.js in bytes.
+# TYPE nodejs_heap_size_used_bytes gauge
+nodejs_heap_size_used_bytes{app="capacity-api"} 26685832
+# HELP db_errors_total Total number of database errors by type
+# TYPE db_errors_total counter
