@@ -132,30 +132,26 @@ app.get('/api/patients/search', async (req, res) => {
 app.post('/api/hospitals/:id/admit', async (req, res) => {
   const hospitalId = Number(req.params.id);
   const pool = getPool();
-  let conn;
   try {
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
-
-    await conn.query(
-      'UPDATE hospitals SET available_beds = available_beds - 1 WHERE id = ?',
+    const [result] = await pool.query(
+      `UPDATE hospitals
+       SET available_beds = available_beds - 1
+       WHERE id = ? AND available_beds > 0`,
       [hospitalId]
     );
 
-    // Notify the external regional bed registry of the new count before we
-    // commit (simulated here with a network round-trip latency).
+    if (result.affectedRows === 0) {
+      return res.status(409).json({ error: 'NO_BEDS_AVAILABLE', hospitalId });
+    }
+
+    // Notify after the atomic decrement has committed so the hospital row lock
+    // is not held during the simulated external network round trip.
     await notifyBedRegistry(hospitalId);
 
-    await conn.commit();
     res.json({ status: 'admitted', hospitalId });
   } catch (err) {
-    if (conn) {
-      try { await conn.rollback(); } catch (_) { /* ignore */ }
-    }
     dbErrorsTotal.inc({ route: '/api/hospitals/:id/admit', code: err.code || 'UNKNOWN' });
     res.status(500).json({ error: err.code || 'ERROR', message: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 });
 

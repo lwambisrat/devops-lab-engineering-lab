@@ -299,36 +299,98 @@ Capture the control group you'll compare every incident against.
 > and the failure will show up as lock waits, timeouts, database errors, or a collapse in throughput. The app updates the hospital row and then waits about 500ms for `notifyBedRegistry()` before committing, so the row lock is held during external I/O.
 
 ### Observation (evidence)
-> While the reproduction runs, inspect concurrent writers to one row:
-> ```sql
-> SELECT * FROM performance_schema.data_locks\G
-> SELECT * FROM sys.innodb_lock_waits\G
-> SHOW ENGINE INNODB STATUS\G   -- TRANSACTIONS section
-> ```
-> Paste the most telling waiter/blocker rows and the failure signature you saw
-> (a DB error + code, a timeout, or stalled/near-zero throughput):
-> ```
+> The before run reproduced the reporter's failure mode. With 500 VUs all
+> admitting to hospital `id=1`, k6 completed only 216 requests in 60s, with
+> 117 successful responses and 99 failed checks. p95 was 56.65s, the failure
+> rate was 45.83%, and successful admission throughput was about
+> `117 / 60s = 1.95 admits/sec`.
 >
-> ```
-| Metric                     | Value | vs. baseline |
-|----------------------------|-------|--------------|
-| p95 / p99 latency          |       |              |
-| Max successful admits/sec  |       |              |
-| DB error(s) + code         |       |              |
-| Error rate                 |       |              |
+> MySQL showed the database-side mechanism directly. During the run,
+> `Threads_connected=21` and `Threads_running=21`, and the processlist showed
+> almost every app connection running the same statement:
+> `UPDATE hospitals SET available_beds = available_beds - 1 WHERE id = 1`.
+> `performance_schema.data_locks` showed one granted `X` record lock on
+> `hospitals.PRIMARY` with `LOCK_DATA: 1` and many `WAITING` record locks for
+> the same key. `performance_schema.data_lock_waits` listed waiter/blocker
+> transaction pairs on that same record. `SHOW ENGINE INNODB STATUS` showed
+> repeated `LOCK WAIT` entries for the same update, with transactions waiting
+> up to 5 seconds for an exclusive record lock.
+>
+> The API metric after the failed run named the database error:
+> `ER_LOCK_WAIT_TIMEOUT`. The counter value was cumulative across repeated
+> investigation attempts, so I use it to identify the error code rather than as
+> the exact per-run failure count. The k6 run's per-run failure count was
+> 99 failed checks out of 216 requests.
+
+| Metric                     | Baseline | Before | After |
+|----------------------------|----------|--------|-------|
+| p95 latency                | 19.27ms | 56.65s | 833.23ms |
+| p95 vs. baseline           | 1x | 2939x worse | 43.2x worse |
+| k6 request rate            | 49.42/s | 3.60/s | 779.05/s |
+| Successful admits/sec      | n/a | 1.95/s | 779.05/s |
+| DB error + code            | none | `ER_LOCK_WAIT_TIMEOUT` | none observed |
+| Error rate                 | 0.00% | 45.83% | 0.00% |
 
 ### Root cause & mechanism
-> Explain why concurrency cannot beat serialization on a single hot row. If the
-> critical section is held for W seconds per admit, what is the theoretical max
-> throughput for that one row, regardless of how many callers pile on?
-> 1 / W = ______ admits/sec. Where does the time in the critical section go, and
-> which of the transactional guarantees is enforcing the wait? ________________
+> The root cause is InnoDB exclusive record-lock contention on one hot
+> `hospitals` row. The endpoint starts a transaction, updates the row, waits
+> 500ms inside `notifyBedRegistry()`, and only then commits. The `UPDATE`
+> obtains an exclusive lock on `hospitals.PRIMARY` for `id=1`, and InnoDB keeps
+> that lock until transaction commit. Every concurrent admit to the same
+> hospital must wait behind that one row lock.
+>
+> The capacity math matches the measurement. The critical section includes the
+> simulated 500ms external registry call, so the theoretical maximum for one
+> hospital row is `1 / 0.5s = 2 admits/sec`, no matter how many callers pile on.
+> The before run measured about `117 successes / 60s = 1.95 successful
+> admits/sec`, which is almost exactly that serialized limit. More concurrency
+> only makes the lock queue longer until requests hit `ER_LOCK_WAIT_TIMEOUT`.
+> The transactional guarantee enforcing the wait is InnoDB row-level locking
+> for write isolation.
+>
+> The CPU evidence supports "waiting" rather than saturation: during the broken
+> run, Docker stats showed `capacity-api` at 2.41% CPU and MySQL at 3.94% CPU
+> while all 20 app MySQL connections were either holding or waiting on the same
+> update. The system looked idle because threads were blocked on a row lock, not
+> because there was no work queued.
 
 ### Fix & verify
-> The change you made (consider: shrinking the critical section, moving slow
-> work out of the transaction, atomic guarded updates, reducing contention on
-> the hot row): _____________________________________________________________
-> Re-measured throughput / error rate: ______________________________________
+> Fix applied: I removed the explicit transaction and changed the bed decrement
+> into one atomic guarded update:
+> `UPDATE hospitals SET available_beds = available_beds - 1 WHERE id = ? AND
+> available_beds > 0`. If no row is affected, the API returns
+> `409 NO_BEDS_AVAILABLE`. Otherwise the statement commits immediately and the
+> simulated registry notify runs afterward, outside the database lock.
+>
+> Verification: the after run passed both k6 thresholds. p95 fell from 56.65s to
+> 833.23ms, failures dropped from 45.83% to 0.00%, and throughput increased from
+> 3.60 req/s to 779.05 req/s. `SHOW ENGINE INNODB STATUS` after the run showed
+> no active lock waits. A mid-run after sample still showed momentary waiters on
+> `hospitals.PRIMARY`, which is expected because all requests still update the
+> same row, but the waits no longer include the 500ms external call and did not
+> produce lock wait timeouts.
+>
+> The post-fix throughput is no longer the hot-row lock ceiling. The minimum
+> response time was 504.55ms, which is the simulated `notifyBedRegistry()`
+> latency floor. With 500 VUs and average latency of 635.05ms, Little's Law
+> predicts `500 / 0.63505s = 787 req/s`, close to the measured 779.05 req/s.
+> That means the fixed endpoint is bounded mostly by keeping the 500ms notify in
+> the request path, not by the row lock.
+>
+> Trade-off: moving the registry notify after the database update improves
+> throughput by shrinking the row-lock critical section, but it weakens
+> cross-system consistency. If `notifyBedRegistry()` fails or the process dies
+> after the local decrement commits, the hospital bed count changes locally but
+> the registry may not hear about it. If the API returned 500 after such a
+> committed decrement, a client retry could double-decrement a bed. A production
+> version should use a transactional outbox or an idempotent admit request ID so
+> the registry update can be retried safely.
+>
+> The `available_beds > 0` guard prevents over-admission and returns
+> `409 NO_BEDS_AVAILABLE` when no row is affected. This path was not exercised
+> in the load test because the seeded hospital had hundreds of thousands of beds
+> remaining, so it is a correctness guard included with the fix rather than a
+> measured part of the performance result.
 
 ---
 

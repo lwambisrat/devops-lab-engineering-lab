@@ -1,0 +1,2 @@
+# HELP db_errors_total Total number of database errors by type
+# TYPE db_errors_total counter
