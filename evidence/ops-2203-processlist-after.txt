@@ -1,0 +1,27 @@
+Variable_name	Value
+Threads_running	22
+Variable_name	Value
+Threads_connected	21
+Id	User	Host	db	Command	Time	State	Info
+5	event_scheduler	localhost	NULL	Daemon	30413	Waiting on empty queue	NULL
+6034	root	172.21.0.4:42562	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6035	root	172.21.0.4:42546	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6036	root	172.21.0.4:42534	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6037	root	172.21.0.4:42574	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6038	root	172.21.0.4:42570	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6039	root	172.21.0.4:42590	capacity_lab	Query	0	waiting for handler commit	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6040	root	172.21.0.4:42576	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6041	root	172.21.0.4:42604	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6042	root	172.21.0.4:42610	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6043	root	172.21.0.4:42614	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6044	root	172.21.0.4:42620	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6045	root	172.21.0.4:42630	capacity_lab	Query	0	System lock	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6046	root	172.21.0.4:42632	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6047	root	172.21.0.4:42642	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6048	root	172.21.0.4:42644	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6049	root	172.21.0.4:42656	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6050	root	172.21.0.4:42658	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6051	root	172.21.0.4:42674	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6052	root	172.21.0.4:42678	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6053	root	172.21.0.4:42694	capacity_lab	Query	0	updating	UPDATE hospitals\n       SET available_beds = available_beds - 1\n       WHERE id = 1 AND available_beds > 0
+6059	root	localhost	capacity_lab	Query	0	init	SHOW FULL PROCESSLIST

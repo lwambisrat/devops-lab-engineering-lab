@@ -20,11 +20,12 @@
 
 ## OPS-2203 — Bed Admission Contention
 
-- **S — Symptom:** Pending investigation.
-- **C — Cause:** Pending investigation.
-- **A — Action:** Pending investigation.
-- **R — Result:** Pending investigation.
-- **Scar / lesson:** Pending investigation.
+- **S — Symptom:** Under a 500-VU same-hospital admit surge, p95 reached 56.65s, failures reached 45.83%, and successful admits were only about 1.95/sec.
+- **C — Cause:** InnoDB exclusive record-lock contention on the hot `hospitals.PRIMARY` row for `id=1`. The app held the row lock while waiting 500ms inside `notifyBedRegistry()`, so concurrency serialized behind one row and produced `ER_LOCK_WAIT_TIMEOUT`.
+- **A — Action:** Replaced the long transaction with one atomic guarded update, `available_beds = available_beds - 1 WHERE id = ? AND available_beds > 0`, and moved the registry notify after the database statement commits.
+- **R — Result:** p95 improved from 56.65s to 833.23ms, request throughput improved from 3.60 req/s to 779.05 req/s, and failures dropped from 45.83% to 0.00%.
+- **Evidence:** `LAB_JOURNAL.md` OPS-2203 section, `evidence/ops-2203-before-k6.txt`, `evidence/ops-2203-locks-before.txt`, `evidence/ops-2203-innodb-status-before.txt`, `evidence/ops-2203-metrics-before.txt`, `evidence/ops-2203-after-k6.txt`, `evidence/ops-2203-innodb-status-after.txt`.
+- **Scar / lesson:** More callers cannot beat a serialized critical section. If a transaction holds a hot-row lock for 500ms, that row can do only about 2 writes/sec before queues and lock timeouts dominate. Shrinking the lock window improved throughput, but moving the registry notify after commit introduces a dual-write consistency risk that should be handled with an outbox or idempotent request key.
 
 ## OPS-2204 — Export OOM
 

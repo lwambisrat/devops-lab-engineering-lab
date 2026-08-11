@@ -35,10 +35,19 @@ fixing each incident.
 ## OPS-2203
 
 - `ops-2203-before-k6.txt`
+- `ops-2203-processlist-before.txt`
 - `ops-2203-locks-before.txt`
 - `ops-2203-innodb-status-before.txt`
+- `ops-2203-metrics-before.txt`
+- `ops-2203-api-logs-before.txt`
+- `ops-2203-docker-stats-before.txt`
 - `ops-2203-after-k6.txt`
+- `ops-2203-processlist-after.txt`
 - `ops-2203-locks-after.txt`
+- `ops-2203-innodb-status-after.txt`
+- `ops-2203-metrics-after.txt`
+- `ops-2203-api-logs-after.txt`
+- `ops-2203-docker-stats-after.txt`
 - `ops-2203-grafana-before.png`
 - `ops-2203-grafana-after.png`
 

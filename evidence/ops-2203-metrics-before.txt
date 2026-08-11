@@ -1,0 +1,3 @@
+# HELP db_errors_total Total number of database errors by type
+# TYPE db_errors_total counter
+db_errors_total{route="/api/hospitals/:id/admit",code="ER_LOCK_WAIT_TIMEOUT",app="capacity-api"} 216
