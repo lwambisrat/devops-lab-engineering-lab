@@ -495,15 +495,122 @@ Capture the control group you'll compare every incident against.
 
 ## Post-incident review (synthesis)
 
-> Rank the four incidents by **blast radius** (threat to overall availability at
-> scale), justified with your measured numbers:
-> 1. ____________________________________________________________________
-> 2. ____________________________________________________________________
-> 3. ____________________________________________________________________
-> 4. ____________________________________________________________________
->
-> If you could ship only **one** fix before a launch, which and why?
-> ____________________________________________________________________________
->
-> For each incident, what alert or dashboard would have caught it in production
-> *before* a user filed a ticket? ____________________________________________
+### Blast-radius ranking
+
+> All latency comparisons below are against the baseline control group:
+> p95=19.27ms, p99=74.03ms, 0.00% errors at 49.42 req/s.
+
+1. **OPS-2204 — export OOM/restart loop.** This is the highest availability
+   risk because one endpoint repeatedly killed the API container. Before the
+   fix, Docker showed `capacity-api` at 159.8MiB / 160MiB, then 14 `oom`,
+   14 `die exitCode=137`, and 14 `start` events in about 3.5 minutes. Each
+   restarted instance survived only 6-10s under the export job. A slow endpoint
+   is bad; a restart loop takes the whole API with it.
+
+2. **OPS-2203 — hot-row admission lock.** This blocked a critical write path.
+   Before the fix, 21/21 MySQL threads were updating the same hospital row,
+   p95 was 56.65s (2939x baseline), failures were 45.83%, and successful admits were only
+   `117 / 60s = 1.95/sec`. That matches the theoretical limit of
+   `1 / 0.5s = 2/sec` caused by holding the row lock during the 500ms registry
+   notify.
+
+3. **OPS-2202 — registration surge app-tier bottleneck.** This looked like a
+   database-pool incident, but the pool-only test disproved that as the dominant
+   cause: RPS changed only 1537.71/s -> 1581.49/s. The stronger evidence was
+   API CPU at 123.33%, MySQL at 23.00%, and k6 failures that never appeared as
+   Express 500s. The blast radius is high because 2000 concurrent clients can
+   overload the single Node process even while MySQL looks healthy: p95 went to
+   1.63s (85x baseline) on the cheapest read in the service, and every read
+   endpoint shares that process. I rank it below OPS-2203 because it degraded
+   without failing — 0.00% errors before the fix, and it recovered on its own
+   when concurrency dropped — whereas OPS-2203 hard-failed 45.83% of admissions
+   on a clinical write path. If the ranking criterion were "number of endpoints
+   affected" rather than "severity of failure," these two would swap.
+
+4. **OPS-2201 — patient search payload blow-up.** This was severe for the
+   search route but had the narrowest blast radius. Before the fix, p95 was
+   10.58s (549x baseline) and throughput was 19.83/s. The index-only test showed the obvious
+   index fix did not help: p95 was 16.59s and throughput was 19.64/s because
+   the endpoint still returned 10,000 full records. Bounding the payload fixed
+   the route to p95=173.26ms and 1798.85/s.
+
+### How the four incidents and fixes interact
+
+These were not four independent bugs. Two mechanisms account for all four
+tickets, and one of my own fixes made a later incident worse.
+
+- **`SELECT *` with no bound appeared in three of the four incidents.**
+  `/api/patients/search` returned 10,000 full rows (3.59MB/response),
+  `/api/patients/recent` returned all columns for 50 rows (18.4KB/response),
+  and `/api/patients/export` returned the whole table (36.7MB/response). Three
+  different tickets, three different symptoms — 10s latency, app-tier CPU
+  saturation, and OOM kills — from the same coding habit. Bounding columns
+  and row counts was part of the fix in all three.
+- **`connectionLimit: 2` shaped OPS-2201 and OPS-2202.** Two independent runs
+  converged on the same ceiling: 2 connections / 1.11ms = 1798/s in the fixed
+  2201 run, and 2 / 1.30ms = 1537/s in the 2202 before-run. That agreement is
+  what let me measure the pool width from throughput alone.
+- **Fixing OPS-2202 made OPS-2204 worse.** I widened the pool from 2 to 20 for
+  the registration surge. That permitted up to 20 concurrent unbounded exports
+  instead of 2, and each in-flight export needed roughly 120MB against a 160MB
+  cap. I predicted this in the OPS-2201 write-up before running OPS-2204, and
+  the crash loop confirmed it: instances died after 6-10s. The order I fixed
+  things in changed the severity of a later incident, which is an argument for
+  bounding payloads *before* widening any concurrency limit.
+
+### One fix before launch
+
+If I could ship only one fix before launch, I would ship **OPS-2204's streaming
+export fix**. It changes the failure mode from "the API restarts every 6-10s"
+to "the export is slow but completes." The after run completed 150/150 checks
+with 0.00% failures, API memory stayed around 71.5MiB / 160MiB, and the sampled
+Docker events window had no OOM, die, or start events. This is the fix that most
+directly protects overall service availability.
+
+The deciding factor is that OPS-2204 is the only incident triggered by a
+*scheduled* job rather than by user traffic. The other three need a traffic
+spike to fire, so their probability depends on load. The nightly export runs
+every night, so this failure is a certainty rather than a risk, and it is the
+only one of the four that kills the process and takes unrelated requests down
+with it.
+
+### Alerts and dashboards
+
+- **OPS-2201:** alert on `/api/patients/search` p95 latency over 300ms for
+  5 minutes, plus a dashboard panel for response bytes per route. The real
+  signal was not just query time; it was multi-MB responses from a lookup
+  endpoint.
+- **OPS-2202:** alert when API CPU is above 100% while MySQL CPU and
+  `Threads_running` stay low, plus an alert on non-200 or aborted client
+  requests that do not appear as Express 500s. That catches the "DB looks idle,
+  app is overloaded" case. The most direct signal would have been
+  `nodejs_eventloop_lag_seconds`, which `collectDefaultMetrics` already exports
+  and which no dashboard in this lab plots — it measures the bottleneck I found
+  instead of inferring it from a CPU ratio. Pool acquire-wait time would have
+  been the companion metric, and its absence is why the pool looked guilty for
+  as long as it did.
+- **OPS-2203:** alert on `ER_LOCK_WAIT_TIMEOUT` and InnoDB row-lock waits for
+  `hospitals.PRIMARY`, plus a dashboard showing lock wait count by table/index.
+  The capacity signal was 1.95 successful admits/sec against a 2/sec serialized
+  lock ceiling.
+- **OPS-2204:** alert when API RSS exceeds 85% of the container limit, and alert
+  immediately on Docker `oom`, `die exitCode=137`, or restart-count increases.
+  A full-table export should also have its own bytes-sent and duration panel.
+  The cheapest control here is not an alert at all but a deploy-time check:
+  fail the build when V8's `--max-old-space-size` exceeds the container memory
+  limit. This service shipped with 256MB against a 160MB cap, which is why it
+  over-committed and was OOM-killed instead of garbage-collecting to survive.
+
+None of these four would have fired on a database dashboard. Every mechanism I
+found — response payload size, Node event-loop saturation, row-lock hold time,
+and container memory — lives above or beside MySQL, not inside it. That is the
+practical reason the DBAs in OPS-2202 could truthfully say "the DB is bored"
+while the service was failing.
+
+### Biggest surprise
+
+The surprise was that "the database looks fine" meant three different things in
+three incidents. OPS-2202 was mostly Node/socket pressure, OPS-2203 was InnoDB
+row-lock waiting with low CPU, and OPS-2204 was API memory/OOM while MySQL was
+almost idle. The same surface symptom needed three different mechanisms and
+three different fixes.
