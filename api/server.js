@@ -100,10 +100,21 @@ app.get('/api/patients/search', async (req, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query(
-      'SELECT * FROM patients WHERE last_name = ?',
+      `SELECT id, first_name, last_name, email, diagnosis, created_at
+       FROM patients
+       WHERE last_name = ?
+       ORDER BY id
+       LIMIT 51`,
       [lastName]
     );
-    res.json({ count: rows.length, lastName, data: rows });
+    const data = rows.slice(0, 50);
+    res.json({
+      count: data.length,
+      returnedCount: data.length,
+      hasMore: rows.length > 50,
+      lastName,
+      data,
+    });
   } catch (err) {
     dbErrorsTotal.inc({ route: '/api/patients/search', code: err.code || 'UNKNOWN' });
     res.status(500).json({ error: err.code || 'ERROR', message: err.message });

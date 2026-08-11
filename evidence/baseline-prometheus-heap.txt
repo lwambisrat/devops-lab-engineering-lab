@@ -1,0 +1,8 @@
+Query:
+max_over_time(nodejs_heap_size_used_bytes[5m])
+
+Result:
+{"status":"success","data":{"resultType":"vector","result":[{"metric":{"app":"capacity-api","instance":"capacity-api:3000","job":"capacity-api"},"value":[1786473075.911,"24134496"]}]}}
+
+Peak heap:
+24,134,496 bytes = approximately 23.0 MiB

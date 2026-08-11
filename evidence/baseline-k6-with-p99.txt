@@ -1,0 +1,25 @@
+k6 run --summary-trend-stats="avg,min,med,max,p(95),p(99)" load-tests/00-baseline.js
+
+THRESHOLDS
+http_req_duration: p(95)<200 passed, p(95)=19.27ms
+http_req_failed: rate<0.01 passed, rate=0.00%
+
+TOTAL RESULTS
+checks_total: 1500, 49.415785/s
+checks_succeeded: 100.00%, 1500 out of 1500
+checks_failed: 0.00%, 0 out of 1500
+
+HTTP
+http_req_duration: avg=10.68ms min=1ms med=9.23ms max=91.47ms p(95)=19.27ms p(99)=74.03ms
+http_req_failed: 0.00%, 0 out of 1500
+http_reqs: 1500, 49.415785/s
+
+EXECUTION
+iteration_duration: avg=1.01s min=1s med=1s max=1.09s p(95)=1.01s p(99)=1.07s
+iterations: 1500, 49.415785/s
+vus: 50
+vus_max: 50
+
+NETWORK
+data_received: 28 MB, 909 kB/s
+data_sent: 134 kB, 4.4 kB/s

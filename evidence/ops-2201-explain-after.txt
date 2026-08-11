@@ -1,0 +1,2 @@
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	patients	NULL	ref	idx_patients_last_name	idx_patients_last_name	258	const	10000	100.00	NULL
