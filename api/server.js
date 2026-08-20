@@ -11,12 +11,16 @@
  *   POST /api/hospitals/:id/admit    Admit a patient (decrement bed count)
  *   GET  /api/patients/export        Full patient export for the analytics team
  *   GET  /api/audit/ping             Mongo audit-store health probe
+ *   GET  /healthz                    Liveness — process is up
+ *   GET  /readyz                     Readiness — DB reachable, pool OK, secret resolved
+ *   GET  /debug/secret-source        Where DB creds came from (ARN + version only)
  *   GET  /metrics                    Prometheus metrics
  */
 
 const express = require('express');
 const client = require('prom-client');
-const { getPool, getMongo } = require('./database');
+const { loadDbCredentials, getSecretSource } = require('./secrets');
+const { getPool, getMongo, initDatabase, checkDbReadiness } = require('./database');
 
 const app = express();
 app.use(express.json());
@@ -69,7 +73,38 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 // Health & metrics
 // ---------------------------------------------------------------------------
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+let secretLoadFailed = false;
+let secretLoadError = null;
+
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// Backward-compatible alias for older local checks.
+app.get('/health', (_req, res) => {
+  res.redirect(307, '/healthz');
+});
+
+app.get('/readyz', async (_req, res) => {
+  if (secretLoadFailed) {
+    return res.status(503).json({
+      status: 'not_ready',
+      reason: 'secret_failed',
+      message: secretLoadError,
+    });
+  }
+
+  const check = await checkDbReadiness();
+  if (!check.ready) {
+    return res.status(503).json({ status: 'not_ready', reason: check.reason });
+  }
+
+  res.status(200).json({ status: 'ready' });
+});
+
+app.get('/debug/secret-source', (_req, res) => {
+  res.json(getSecretSource());
+});
 
 app.get('/metrics', async (_req, res) => {
   res.set('Content-Type', register.contentType);
@@ -222,9 +257,32 @@ app.get('/api/audit/ping', async (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Boot
+// Boot — resolve DB credentials, initialize MySQL, then listen
 // ---------------------------------------------------------------------------
-app.listen(PORT, () => {
+async function start() {
+  try {
+    const credentials = await loadDbCredentials();
+    await initDatabase(credentials);
+  } catch (err) {
+    secretLoadFailed = true;
+    secretLoadError = err.message;
+    // eslint-disable-next-line no-console
+    console.error(
+      `DB credential bootstrap failed: ${err.message} — /readyz will return 503`
+    );
+  }
+
+  app.listen(PORT, () => {
+    const source = getSecretSource();
+    // eslint-disable-next-line no-console
+    console.log(
+      `capacity-api listening on :${PORT} (metrics at /metrics, secret arn=${source.arn})`
+    );
+  });
+}
+
+start().catch((err) => {
   // eslint-disable-next-line no-console
-  console.log(`capacity-api listening on :${PORT} (metrics at /metrics)`);
+  console.error('Fatal boot error:', err);
+  process.exit(1);
 });
