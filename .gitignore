@@ -19,4 +19,13 @@ Thumbs.db
 
 # Logs / test output
 *.log
+!evidence/**/*.log
 load-tests/results/
+
+# Terraform / A2 local secrets
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+terraform/environments/*.tfvars
+*.tfvars

@@ -1,0 +1,22 @@
+# Copy this file to ../lwam.tfvars (gitignored) and fill in real Aiven values.
+
+project_name   = "rh-lwam"
+db_name        = "capacity_lab"
+secret_name    = "regional-health/lwam/db"
+instance_type  = "t3.small"
+
+skip_root_block_device = true
+enable_alb             = false
+
+# Build/tag locally as localstack-ec2/app:ami-<12 hex chars>, then put only
+# the ami-* part here.
+app_ami_id = "ami-000000000000"
+
+aiven_host     = "mysql-xxxx-lwam.aivencloud.com"
+aiven_port     = 12345
+aiven_user     = "avnadmin"
+aiven_password = "REPLACE_ME"
+
+# Paste the whole downloaded ca.pem here, or use a base64-encoded PEM.
+# The real terraform/lwam.tfvars file is ignored by git.
+aiven_ca_cert = "REPLACE_ME"

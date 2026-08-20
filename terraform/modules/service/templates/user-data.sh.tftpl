@@ -1,0 +1,160 @@
+#!/bin/bash
+# =============================================================================
+# user-data — rendered by templatefile() in modules/service/main.tf
+#
+# CREDENTIAL RULE: the only credential-shaped value in this file is the Secrets
+# Manager ARN. The password is fetched at boot by api/secrets.js calling
+# GetSecretValue, so it is absent from user-data, from the image, and from git.
+# `evidence/03-secrets/user-data.txt` is graded on exactly that.
+#
+# Heredocs below are quoted (<<'EOF') so bash performs no expansion of its own.
+# Every $${...} was already substituted by Terraform before this script existed,
+# which is also why nginx variables like $host survive intact.
+# =============================================================================
+set -euo pipefail
+
+LOG=/var/log/user-data.log
+exec > >(tee -a "$LOG") 2>&1
+echo "[user-data] start $(date -u +%FT%TZ)"
+
+APP_DIR=/usr/src/app
+ENV_FILE=/etc/regional-health.env
+APP_LOG=/var/log/regional-health-app.log
+
+# -----------------------------------------------------------------------------
+# 1. Runtime configuration.
+#
+# DB_SECRET_ARN is the important line. If it is missing, api/secrets.js falls
+# back to credentialsFromEnv() *silently* — the app boots green against the
+# local-dev defaults and never touches Secrets Manager, which quietly voids the
+# C3 evidence. If boot.log ever shows a connection using the local-dev
+# password, this variable failed to reach the process.
+#
+# MYSQL_HOST/MYSQL_PORT are diagnostic breadcrumbs, not the live path: with the
+# ARN set, the app reads host and port out of the secret envelope instead. The
+# raw endpoint modules/data reported is recorded alongside the address that is
+# actually reachable from in here, because on LocalStack they differ (see the
+# note in variables.tf and FIDELITY.md).
+# -----------------------------------------------------------------------------
+cat > "$ENV_FILE" <<'EOF'
+PORT=${app_port}
+DB_SECRET_ARN=${secret_arn}
+AWS_REGION=${aws_region}
+AWS_ENDPOINT_URL=${aws_endpoint_url}
+AWS_ACCESS_KEY_ID=test
+AWS_SECRET_ACCESS_KEY=test
+MYSQL_HOST=${db_host}
+MYSQL_PORT=${db_port}
+# Endpoint as reported by modules/data (bare localhost on LocalStack, which
+# from inside this container would resolve to the container itself):
+# DB_ENDPOINT_AS_REPORTED=${db_endpoint_raw}
+EOF
+chmod 600 "$ENV_FILE"
+
+echo "[user-data] wrote $ENV_FILE with secret arn=${secret_arn} (value not resolved here)"
+
+# -----------------------------------------------------------------------------
+# 2. Start the app.
+#
+# The AMI is the app image, so /usr/src/app is already populated and node is on
+# PATH. Creds are exported from the env file rather than passed inline so they
+# never appear in the process list.
+# -----------------------------------------------------------------------------
+if [ ! -d "$APP_DIR" ]; then
+  echo "[user-data] FATAL: $APP_DIR missing — is the AMI the app image?" >&2
+  exit 1
+fi
+
+cd "$APP_DIR"
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+
+nohup node server.js >> "$APP_LOG" 2>&1 &
+echo "[user-data] app started, pid $!, logging to $APP_LOG"
+
+# -----------------------------------------------------------------------------
+# 3. Wait for liveness before wiring nginx in front of it.
+#
+# /healthz, not /readyz: liveness only proves the process is listening. The app
+# is deliberately allowed to come up not-ready (DB down or secret unresolved) so
+# that /readyz can report 503 and the target group can hold traffic back. Gating
+# nginx on readiness here would hide the exact behaviour C4 asks us to prove.
+# -----------------------------------------------------------------------------
+for attempt in $(seq 1 30); do
+  if curl -fsS "http://127.0.0.1:${app_port}/healthz" >/dev/null 2>&1; then
+    echo "[user-data] /healthz responded after $attempt attempt(s)"
+    break
+  fi
+  sleep 2
+done
+
+# -----------------------------------------------------------------------------
+# 4. nginx in front of the app.
+#
+# FIDELITY: open-source nginx has no *active* upstream health checking (that is
+# an nginx Plus feature), so readiness is enforced two ways instead:
+#   - passively here, via max_fails/fail_timeout, which ejects the upstream
+#     after repeated failures;
+#   - actively at the target group, whose health_check path is /readyz.
+# /readyz is proxied without rewriting the status code, so a 503 from the app
+# arrives at the caller as a 503 rather than an nginx 502.
+# -----------------------------------------------------------------------------
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y --no-install-recommends nginx curl
+else
+  echo "[user-data] WARN: apt-get unavailable, skipping nginx install" >&2
+fi
+
+if command -v nginx >/dev/null 2>&1; then
+  rm -f /etc/nginx/sites-enabled/default
+  mkdir -p /etc/nginx/conf.d
+
+  cat > /etc/nginx/conf.d/regional-health.conf <<'EOF'
+upstream regional_health_app {
+    server 127.0.0.1:${app_port} max_fails=3 fail_timeout=10s;
+}
+
+server {
+    listen 80 default_server;
+    server_name _;
+
+    # Proves nginx itself is serving, independent of the app.
+    location = /nginx-health {
+        access_log off;
+        return 200 "nginx ok\n";
+    }
+
+    # Readiness passes through untouched: a 503 from the app must stay a 503.
+    location = /readyz {
+        proxy_pass http://regional_health_app;
+        proxy_intercept_errors off;
+        proxy_next_upstream off;
+    }
+
+    location / {
+        proxy_pass http://regional_health_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # The export endpoint streams ~37MB; buffering it would defeat the
+        # bounded-memory fix from Assignment 1 (OPS-2204) by reintroducing an
+        # O(N) buffer, this time in nginx.
+        proxy_buffering off;
+        proxy_read_timeout 120s;
+    }
+}
+EOF
+
+  nginx -t
+  nginx -s reload 2>/dev/null || nginx
+  echo "[user-data] nginx listening on :80 -> 127.0.0.1:${app_port}"
+fi
+
+echo "[user-data] done $(date -u +%FT%TZ)"
