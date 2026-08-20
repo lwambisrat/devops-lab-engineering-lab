@@ -82,6 +82,12 @@ variable "skip_root_block_device" {
   default     = false
 }
 
+variable "egress_cidr_blocks" {
+  description = "CIDR blocks allowed for outbound traffic. Defaults to the default VPC CIDR; override with explicit service CIDRs when a deployment must reach an external managed database."
+  type        = list(string)
+  default     = []
+}
+
 variable "health_check_path" {
   description = "Path the load balancer target group probes. /readyz (not /healthz) is deliberate: readiness means the DB is reachable and the secret resolved, so a booted-but-not-ready instance is pulled out of rotation."
   type        = string

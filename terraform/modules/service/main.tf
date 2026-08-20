@@ -61,13 +61,13 @@ resource "aws_security_group" "app" {
     cidr_blocks = [data.aws_vpc.default.cidr_block]
   }
 
-  # Egress is open so the instance can call Secrets Manager and install nginx.
+  # Egress is configurable so CI and production-shaped plans can restrict it.
   egress {
     description = "Outbound for Secrets Manager and package installation"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = length(var.egress_cidr_blocks) > 0 ? var.egress_cidr_blocks : [data.aws_vpc.default.cidr_block]
   }
 
   tags = {
@@ -79,7 +79,7 @@ resource "aws_security_group" "app" {
 # Application instance.
 #
 # user_data carries the secret ARN, not the secret value.
-# trivy:ignore:AVD-AWS-0131 -- dynamic root_block_device omitted for LocalStack (FIDELITY.md §6); encrypted when skip_root_block_device=false
+# trivy:ignore:AWS-0131 -- root_block_device is encrypted when enabled; LocalStack Docker AMIs need skip_root_block_device=true
 # -----------------------------------------------------------------------------
 resource "aws_instance" "app" {
   ami                    = var.app_ami_id

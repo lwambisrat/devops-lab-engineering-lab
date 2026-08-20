@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  platform:
+    name: Platform pipeline
+    uses: ./.github/workflows/platform.yml
+    secrets:
+      LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+      AIVEN_HOST: ${{ secrets.AIVEN_HOST }}
+      AIVEN_PORT: ${{ secrets.AIVEN_PORT }}
+      AIVEN_USER: ${{ secrets.AIVEN_USER }}
+      AIVEN_PASSWORD: ${{ secrets.AIVEN_PASSWORD }}
+      AIVEN_CA_CERT: ${{ secrets.AIVEN_CA_CERT }}

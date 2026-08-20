@@ -1,0 +1,10 @@
+# Intentionally empty.
+#
+# Trivy requires this file because the CI workflow passes `trivyignores:
+# .trivyignore`. Add temporary, reviewed suppressions here only when an issue is
+# a documented false positive or accepted lab limitation.
+
+# LocalStack Docker-backed AMIs can require omitting root_block_device at apply
+# time; the module still encrypts the root disk when that block is enabled.
+AWS-0131
+AVD-AWS-0131

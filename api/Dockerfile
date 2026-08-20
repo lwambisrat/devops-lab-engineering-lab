@@ -1,22 +1,30 @@
 # Node.js API image for the Regional Health service.
-FROM node:20-slim
-
-# The seed script (run inside this container) needs the mysql CLI.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends default-mysql-client bash \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:20-alpine AS deps
 
 WORKDIR /usr/src/app
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev \
+    && npm cache clean --force
 
-COPY . .
+FROM alpine:3.23
+
+# Runtime needs node for the API and mysql-client/bash for the seed script.
+RUN apk add --no-cache nodejs bash mysql-client \
+    && addgroup -S node \
+    && adduser -S node -G node
+
+WORKDIR /usr/src/app
+
+COPY --from=deps --chown=node:node /usr/src/app/node_modules ./node_modules
+COPY --chown=node:node . .
 
 # The seed script lives in ../data-seed and is bind-mounted at runtime by
 # docker-compose to /usr/local/bin/seed.sh (it is outside this build context,
 # so it cannot be COPYed here).
 
 EXPOSE 3000
+
+USER node
 
 CMD ["node", "server.js"]
