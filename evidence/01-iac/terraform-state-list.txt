@@ -1,0 +1,6 @@
+module.data.aws_secretsmanager_secret.db
+module.data.aws_secretsmanager_secret_version.db
+module.service.data.aws_subnets.default
+module.service.data.aws_vpc.default
+module.service.aws_instance.app
+module.service.aws_security_group.app

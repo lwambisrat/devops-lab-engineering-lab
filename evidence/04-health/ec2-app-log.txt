@@ -1,0 +1,3 @@
+DB credentials loaded from Secrets Manager arn=arn:aws:secretsmanager:us-east-1:000000000000:secret:regional-health/lwam/db-BkWWOe version=terraform-jTvRurB5pLmAY3Encs54J8OQux tls_ca_present=true
+MySQL pool ready host=regional-health-lwam-mysql456-regional-health-lwam.g.aivencloud.com port=14183 tls=true
+capacity-api listening on :3000 (metrics at /metrics, secret arn=arn:aws:secretsmanager:us-east-1:000000000000:secret:regional-health/lwam/db-BkWWOe)
