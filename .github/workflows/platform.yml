@@ -1,0 +1,327 @@
+name: Platform Pipeline
+
+on:
+  workflow_call:
+    secrets:
+      LOCALSTACK_AUTH_TOKEN:
+        description: Personal LocalStack Hobby auth token. Used only by deploy.
+        required: true
+      AIVEN_HOST:
+        description: Aiven MySQL hostname.
+        required: false
+      AIVEN_PORT:
+        description: Aiven MySQL port.
+        required: false
+      AIVEN_USER:
+        description: Aiven MySQL username.
+        required: false
+      AIVEN_PASSWORD:
+        description: Aiven MySQL password.
+        required: false
+      AIVEN_CA_CERT:
+        description: Aiven CA certificate PEM.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@bcfb9cce635345aac9996cedc19b2de8e01b894f
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  trivy-config:
+    name: trivy config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+
+      - name: Scan IaC and Dockerfile
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297
+        with:
+          scan-type: config
+          scan-ref: .
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
+
+      - name: Write config scan report
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297
+        if: always()
+        with:
+          scan-type: config
+          scan-ref: .
+          format: json
+          output: trivy-config.json
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+          trivyignores: .trivyignore
+
+      - name: Upload config scan report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: trivy-config
+          path: trivy-config.json
+          retention-days: 7
+
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@2ae1ce9c6b7248fdfc5a4f47f3527240521f79b9
+        with:
+          persona: pedantic
+
+      - name: Save zizmor evidence note
+        if: always()
+        run: echo "zizmor scan completed; see GitHub Actions log" > zizmor.txt
+
+      - name: Upload zizmor artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: zizmor
+          path: zizmor.txt
+          retention-days: 7
+
+  docker-build:
+    name: docker build
+    runs-on: ubuntu-latest
+    needs: [gitleaks, trivy-config, zizmor]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+
+      - name: Build API image
+        uses: docker/build-push-action@2ca78c6bec76527009825f31aae0532b4d40d820
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: false
+          load: true
+          tags: capacity-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  trivy-image:
+    name: trivy image
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+
+      - name: Rebuild image for scan
+        uses: docker/build-push-action@2ca78c6bec76527009825f31aae0532b4d40d820
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: false
+          load: true
+          tags: capacity-api:${{ github.sha }}
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297
+        with:
+          scan-type: image
+          image-ref: capacity-api:${{ github.sha }}
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+
+      - name: Write image scan report
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297
+        if: always()
+        with:
+          scan-type: image
+          image-ref: capacity-api:${{ github.sha }}
+          format: json
+          output: trivy-image.json
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+          trivyignores: .trivyignore
+
+      - name: Upload image scan report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: trivy-image
+          path: trivy-image.json
+          retention-days: 7
+
+  deploy:
+    name: LocalStack deploy
+    runs-on: ubuntu-latest
+    needs: [trivy-image]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+
+      - name: Build API image
+        uses: docker/build-push-action@2ca78c6bec76527009825f31aae0532b4d40d820
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: false
+          load: true
+          tags: capacity-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Tag image as LocalStack EC2 AMI
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          docker tag "capacity-api:${GITHUB_SHA}" "localstack-ec2/app:ami-${SHORT_SHA}"
+          echo "AMI_ID=ami-${SHORT_SHA}" >> "${GITHUB_ENV}"
+
+      - name: Start LocalStack in runner
+        uses: LocalStack/setup-localstack@7c8a0cb3405bc58be4c8f763f812aa000bc46303
+        with:
+          install-awslocal: "true"
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+
+      - name: Bootstrap Terraform state
+        run: bash bootstrap/bootstrap.sh
+        env:
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@8620a60d7c841f00a53b5dd39f0027c2d042082f
+        with:
+          terraform_version: 1.9.8
+
+      - name: Install tflocal
+        run: pipx install terraform-local
+
+      - name: Terraform fmt check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: tflocal init
+        working-directory: terraform
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_PROFILE: ""
+        run: |
+          tflocal init -input=false \
+            -backend-config="bucket=regional-health-tfstate" \
+            -backend-config="dynamodb_table=regional-health-tflock" \
+            -backend-config="region=us-east-1" \
+            -backend-config="key=rh/ci/terraform.tfstate" \
+            -backend-config='endpoints={s3="http://localhost:4566",dynamodb="http://localhost:4566"}' \
+            -backend-config="skip_credentials_validation=true" \
+            -backend-config="skip_metadata_api_check=true" \
+            -backend-config="skip_region_validation=true" \
+            -backend-config="skip_requesting_account_id=true" \
+            -backend-config="use_path_style=true"
+
+      - name: tflocal validate
+        working-directory: terraform
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_PROFILE: ""
+        run: tflocal validate
+
+      - name: tflocal apply
+        working-directory: terraform
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_PROFILE: ""
+          TF_VAR_project_name: rh-ci
+          TF_VAR_secret_name: regional-health/ci/db
+          TF_VAR_db_name: defaultdb
+          TF_VAR_instance_type: t3.small
+          TF_VAR_skip_root_block_device: "true"
+          TF_VAR_enable_alb: "false"
+          TF_VAR_app_ami_id: ${{ env.AMI_ID }}
+          TF_VAR_aiven_host: ${{ secrets.AIVEN_HOST }}
+          TF_VAR_aiven_port: ${{ secrets.AIVEN_PORT }}
+          TF_VAR_aiven_user: ${{ secrets.AIVEN_USER }}
+          TF_VAR_aiven_password: ${{ secrets.AIVEN_PASSWORD }}
+          TF_VAR_aiven_ca_cert: ${{ secrets.AIVEN_CA_CERT }}
+        run: |
+          if [ -z "${TF_VAR_aiven_host}" ] || [ -z "${TF_VAR_aiven_password}" ] || [ -z "${TF_VAR_aiven_ca_cert}" ]; then
+            echo "Skipping tflocal apply because AIVEN_* secrets are not configured."
+            exit 0
+          fi
+          tflocal apply -auto-approve -input=false
