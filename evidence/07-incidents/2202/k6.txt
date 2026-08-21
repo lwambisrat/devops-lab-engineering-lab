@@ -1,0 +1,158 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: -
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 2000 max VUs, 35s max duration (incl. graceful stop):
+              * registration_surge: Up to 2000 looping VUs for 30s over 2 stages (gracefulRampDown: 30s, gracefulStop: 5s)
+
+
+running (00.2s), 0098/2000 VUs, 99 complete and 0 interrupted iterations
+registration_surge   [   1% ] 0099/2000 VUs  00.2s/30.0s
+
+running (01.2s), 0499/2000 VUs, 558 complete and 0 interrupted iterations
+registration_surge   [   4% ] 0499/2000 VUs  01.2s/30.0s
+
+running (02.2s), 0899/2000 VUs, 1237 complete and 0 interrupted iterations
+registration_surge   [   7% ] 0899/2000 VUs  02.2s/30.0s
+
+running (03.3s), 1299/2000 VUs, 1937 complete and 0 interrupted iterations
+registration_surge   [  11% ] 1299/2000 VUs  03.3s/30.0s
+
+running (04.2s), 1697/2000 VUs, 2372 complete and 0 interrupted iterations
+registration_surge   [  14% ] 1697/2000 VUs  04.2s/30.0s
+
+running (05.2s), 2000/2000 VUs, 2994 complete and 0 interrupted iterations
+registration_surge   [  17% ] 2000/2000 VUs  05.2s/30.0s
+
+running (06.2s), 2000/2000 VUs, 3602 complete and 0 interrupted iterations
+registration_surge   [  21% ] 2000/2000 VUs  06.2s/30.0s
+
+running (07.2s), 2000/2000 VUs, 4238 complete and 0 interrupted iterations
+registration_surge   [  24% ] 2000/2000 VUs  07.2s/30.0s
+
+running (08.2s), 2000/2000 VUs, 4836 complete and 0 interrupted iterations
+registration_surge   [  27% ] 2000/2000 VUs  08.2s/30.0s
+
+running (09.2s), 2000/2000 VUs, 5228 complete and 0 interrupted iterations
+registration_surge   [  31% ] 2000/2000 VUs  09.2s/30.0s
+
+running (10.2s), 2000/2000 VUs, 6089 complete and 0 interrupted iterations
+registration_surge   [  34% ] 2000/2000 VUs  10.2s/30.0s
+
+running (11.2s), 2000/2000 VUs, 6852 complete and 0 interrupted iterations
+registration_surge   [  37% ] 2000/2000 VUs  11.2s/30.0s
+
+running (12.2s), 2000/2000 VUs, 7540 complete and 0 interrupted iterations
+registration_surge   [  41% ] 2000/2000 VUs  12.2s/30.0s
+
+running (13.2s), 2000/2000 VUs, 8349 complete and 0 interrupted iterations
+registration_surge   [  44% ] 2000/2000 VUs  13.2s/30.0s
+
+running (14.2s), 2000/2000 VUs, 8922 complete and 0 interrupted iterations
+registration_surge   [  47% ] 2000/2000 VUs  14.2s/30.0s
+
+running (15.2s), 2000/2000 VUs, 9741 complete and 0 interrupted iterations
+registration_surge   [  51% ] 2000/2000 VUs  15.2s/30.0s
+
+running (16.2s), 2000/2000 VUs, 10363 complete and 0 interrupted iterations
+registration_surge   [  54% ] 2000/2000 VUs  16.2s/30.0s
+
+running (17.2s), 2000/2000 VUs, 11179 complete and 0 interrupted iterations
+registration_surge   [  57% ] 2000/2000 VUs  17.2s/30.0s
+
+running (18.2s), 2000/2000 VUs, 11825 complete and 0 interrupted iterations
+registration_surge   [  61% ] 2000/2000 VUs  18.2s/30.0s
+
+running (19.2s), 2000/2000 VUs, 12467 complete and 0 interrupted iterations
+registration_surge   [  64% ] 2000/2000 VUs  19.2s/30.0s
+
+running (20.2s), 2000/2000 VUs, 13264 complete and 0 interrupted iterations
+registration_surge   [  67% ] 2000/2000 VUs  20.2s/30.0s
+
+running (21.2s), 2000/2000 VUs, 13975 complete and 0 interrupted iterations
+registration_surge   [  71% ] 2000/2000 VUs  21.2s/30.0s
+
+running (22.2s), 2000/2000 VUs, 14799 complete and 0 interrupted iterations
+registration_surge   [  74% ] 2000/2000 VUs  22.2s/30.0s
+
+running (23.2s), 2000/2000 VUs, 15543 complete and 0 interrupted iterations
+registration_surge   [  77% ] 2000/2000 VUs  23.2s/30.0s
+
+running (24.2s), 2000/2000 VUs, 16127 complete and 0 interrupted iterations
+registration_surge   [  81% ] 2000/2000 VUs  24.2s/30.0s
+
+running (25.2s), 2000/2000 VUs, 16878 complete and 0 interrupted iterations
+registration_surge   [  84% ] 2000/2000 VUs  25.2s/30.0s
+
+running (26.2s), 2000/2000 VUs, 17493 complete and 0 interrupted iterations
+registration_surge   [  87% ] 2000/2000 VUs  26.2s/30.0s
+
+running (27.2s), 2000/2000 VUs, 18271 complete and 0 interrupted iterations
+registration_surge   [  91% ] 2000/2000 VUs  27.2s/30.0s
+
+running (28.2s), 2000/2000 VUs, 19022 complete and 0 interrupted iterations
+registration_surge   [  94% ] 2000/2000 VUs  28.2s/30.0s
+
+running (29.2s), 2000/2000 VUs, 19672 complete and 0 interrupted iterations
+registration_surge   [  97% ] 2000/2000 VUs  29.2s/30.0s
+
+running (30.2s), 1759/2000 VUs, 20310 complete and 0 interrupted iterations
+registration_surge ↓ [ 100% ] 2000/2000 VUs  30s
+
+running (31.2s), 0903/2000 VUs, 21166 complete and 0 interrupted iterations
+registration_surge ↓ [ 100% ] 2000/2000 VUs  30s
+
+running (32.2s), 0531/2000 VUs, 21538 complete and 0 interrupted iterations
+registration_surge ↓ [ 100% ] 2000/2000 VUs  30s
+
+running (33.2s), 0210/2000 VUs, 21859 complete and 0 interrupted iterations
+registration_surge ↓ [ 100% ] 2000/2000 VUs  30s
+
+running (34.2s), 0068/2000 VUs, 22002 complete and 0 interrupted iterations
+registration_surge ↓ [ 100% ] 2000/2000 VUs  30s
+
+
+  █ THRESHOLDS 
+
+    http_req_failed
+    ✓ 'rate<0.05' rate=1.15%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 22044  629.708403/s
+    checks_succeeded...: 98.84% 21790 out of 22044
+    checks_failed......: 1.15%  254 out of 22044
+
+    ✗ status is 200
+      ↳  98% — ✓ 21790 / ✗ 254
+
+    HTTP
+    http_req_duration..............: avg=2.59s min=5.13ms med=793.83ms max=32.05s p(90)=1.64s p(95)=16.57s
+      { expected_response:true }...: avg=2.43s min=5.13ms med=786.42ms max=32.05s p(90)=1.62s p(95)=16.52s
+    http_req_failed................: 1.15%  254 out of 22044
+    http_reqs......................: 22044  629.708403/s
+
+    EXECUTION
+    iteration_duration.............: avg=2.59s min=5.76ms med=793.96ms max=32.05s p(90)=1.64s p(95)=16.58s
+    iterations.....................: 22044  629.708403/s
+    vus............................: 67     min=67           max=2000
+    vus_max........................: 2000   min=2000         max=2000
+
+    NETWORK
+    data_received..................: 173 MB 4.9 MB/s
+    data_sent......................: 2.0 MB 56 kB/s
+
+
+
+
+running (35.0s), 0000/2000 VUs, 22044 complete and 25 interrupted iterations
+registration_surge ✓ [ 100% ] 0025/2000 VUs  30s

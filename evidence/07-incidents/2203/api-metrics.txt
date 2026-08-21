@@ -1,0 +1,18 @@
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/metrics",status_code="200"} 101
+http_request_duration_seconds_count{app="capacity-api",method="HEAD",route="/",status_code="404"} 2
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/",status_code="404"} 2
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/readyz",status_code="200"} 1
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/api/patients/search",status_code="200"} 19199
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/api/patients/recent",status_code="200"} 21790
+http_request_duration_seconds_count{app="capacity-api",method="POST",route="/api/hospitals/:id/admit",status_code="200"} 8137
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",route="/metrics",status_code="200",app="capacity-api"} 101
+http_requests_total{method="HEAD",route="/",status_code="404",app="capacity-api"} 2
+http_requests_total{method="GET",route="/",status_code="404",app="capacity-api"} 2
+http_requests_total{method="GET",route="/readyz",status_code="200",app="capacity-api"} 1
+http_requests_total{method="GET",route="/api/patients/search",status_code="200",app="capacity-api"} 19199
+http_requests_total{method="GET",route="/api/patients/recent",status_code="200",app="capacity-api"} 21790
+http_requests_total{method="POST",route="/api/hospitals/:id/admit",status_code="200",app="capacity-api"} 8137
+# HELP db_errors_total Total number of database errors by type
+# TYPE db_errors_total counter

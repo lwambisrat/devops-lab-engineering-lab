@@ -1,0 +1,11 @@
+OPS-2204 replay did not complete within the captured window.
+
+Observed k6 state:
+50/50 VUs active
+0 complete iterations
+0 interrupted iterations
+run reached about 1m15s of the planned 2m0s
+
+Because no /api/patients/export response finished, Express did not increment
+http_requests_total for that route. The failure mode observed here is request
+non-completion / long-running export work, not a completed HTTP 500 response.
