@@ -1,0 +1,10 @@
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/metrics",status_code="200"} 555
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/healthz",status_code="200"} 1
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/api/patients/search",status_code="500"} 33030
+http_request_duration_seconds_count{app="capacity-api",method="GET",route="/api/patients/recent",status_code="500"} 33906
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",route="/metrics",status_code="200",app="capacity-api"} 555
+http_requests_total{method="GET",route="/healthz",status_code="200",app="capacity-api"} 1
+http_requests_total{method="GET",route="/api/patients/search",status_code="500",app="capacity-api"} 33030
+http_requests_total{method="GET",route="/api/patients/recent",status_code="500",app="capacity-api"} 33906

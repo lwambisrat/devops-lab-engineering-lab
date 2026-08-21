@@ -1,0 +1,8 @@
+capacity-api  | DB credential bootstrap failed: connect ECONNREFUSED 172.18.0.3:3306 — /readyz will return 503
+capacity-api  | capacity-api listening on :3000 (metrics at /metrics, secret arn=env)
+capacity-api  | DB credential bootstrap failed: getaddrinfo ENOTFOUND mysql-db — /readyz will return 503
+capacity-api  | capacity-api listening on :3000 (metrics at /metrics, secret arn=env)
+capacity-api  | DB credential bootstrap failed: getaddrinfo ENOTFOUND mysql-db — /readyz will return 503
+capacity-api  | capacity-api listening on :3000 (metrics at /metrics, secret arn=env)
+capacity-api  | MySQL pool ready host=mysql-db port=3306 tls=false
+capacity-api  | capacity-api listening on :3000 (metrics at /metrics, secret arn=env)
