@@ -1,0 +1,18 @@
+
+Warning: Deprecated Parameter
+
+The parameter "dynamodb_table" is deprecated. Use parameter "use_lockfile"
+instead.
+module.service.data.aws_vpc.default: Reading...
+module.data.aws_secretsmanager_secret.db: Refreshing state... [id=arn:aws:secretsmanager:us-east-1:000000000000:secret:regional-health/lwam/db-BkWWOe]
+module.data.aws_secretsmanager_secret_version.db: Refreshing state... [id=arn:aws:secretsmanager:us-east-1:000000000000:secret:regional-health/lwam/db-BkWWOe|terraform-jTvRurB5pLmAY3Encs54J8OQux]
+module.service.data.aws_vpc.default: Read complete after 0s [id=vpc-33b0da2cf12b1ef61]
+module.service.data.aws_subnets.default: Reading...
+module.service.aws_security_group.app: Refreshing state... [id=sg-ad7ec3dd7653c8abc]
+module.service.data.aws_subnets.default: Read complete after 1s [id=us-east-1]
+module.service.aws_instance.app: Refreshing state... [id=i-14a170c7d99a4b9fb]
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.

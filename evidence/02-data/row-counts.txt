@@ -1,0 +1,2 @@
+patients: 10000
+hospitals: 5
